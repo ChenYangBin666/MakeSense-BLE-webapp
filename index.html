@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>MakeSense Monitor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <h1>MakeSense</h1>
+            <div class="connection-status" id="connectionStatus">
+                <span class="status-dot disconnected"></span>
+                <span class="status-text">未连接</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Current Value Display -->
+            <section class="value-display">
+                <div class="current-value" id="currentValue">--</div>
+                <div class="value-unit">μA</div>
+                <div class="status-message" id="statusMessage">等待连接...</div>
+            </section>
+
+            <!-- Chart -->
+            <section class="chart-container">
+                <canvas id="chart"></canvas>
+            </section>
+
+            <!-- Stats -->
+            <section class="stats-row">
+                <div class="stat-item">
+                    <span class="stat-label">最小值</span>
+                    <span class="stat-value" id="minValue">--</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">最大值</span>
+                    <span class="stat-value" id="maxValue">--</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">采样数</span>
+                    <span class="stat-value" id="sampleCount">0</span>
+                </div>
+            </section>
+        </main>
+
+        <!-- Control Panel -->
+        <footer class="control-panel">
+            <button class="btn btn-primary" id="connectBtn">
+                <span class="btn-icon">📡</span>
+                连接设备
+            </button>
+            <button class="btn btn-secondary" id="zeroBtn" disabled>
+                <span class="btn-icon">🎯</span>
+                调零
+            </button>
+            <button class="btn btn-secondary" id="clearBtn">
+                <span class="btn-icon">🗑️</span>
+                清空
+            </button>
+            <button class="btn btn-secondary" id="exportBtn" disabled>
+                <span class="btn-icon">💾</span>
+                导出
+            </button>
+        </footer>
+    </div>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="ble.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
