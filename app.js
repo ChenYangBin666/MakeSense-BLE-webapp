@@ -53,7 +53,7 @@ class MakeSenseApp {
         this.state = {
             isPaused: false,
             yAxisMode: 'auto', // 'auto' or 'fixed'
-            yMin: 0,
+            yMin: -1.0,
             yMax: 1.0,
             isAlarmEnabled: false,
             alarmThreshold: 1.0,
