@@ -16,6 +16,10 @@ class MakeSenseApp {
             count: 0
         };
 
+        // Timer
+        this.sessionStartTime = null;
+        this.timerInterval = null;
+
         // Chart
         this.chart = null;
 
@@ -27,7 +31,7 @@ class MakeSenseApp {
             statusMessage: document.getElementById('statusMessage'),
             minValue: document.getElementById('minValue'),
             maxValue: document.getElementById('maxValue'),
-            sampleCount: document.getElementById('sampleCount'),
+            sessionTimer: document.getElementById('sessionTimer'), // Changed from sampleCount
             connectBtn: document.getElementById('connectBtn'),
             zeroBtn: document.getElementById('zeroBtn'),
             clearBtn: document.getElementById('clearBtn'),
@@ -270,6 +274,43 @@ class MakeSenseApp {
         this.elements.alarmSound.currentTime = 0;
     }
 
+    startTimer() {
+        if (this.timerInterval) clearInterval(this.timerInterval);
+
+        this.sessionStartTime = Date.now();
+        this.updateTimerDisplay(); // Initial update
+
+        this.timerInterval = setInterval(() => {
+            this.updateTimerDisplay();
+        }, 1000);
+    }
+
+    stopTimer() {
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
+        }
+    }
+
+    resetTimer() {
+        this.stopTimer();
+        this.sessionStartTime = null;
+        this.elements.sessionTimer.textContent = '00:00';
+    }
+
+    updateTimerDisplay() {
+        if (!this.sessionStartTime) return;
+
+        const elapsed = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+
+        const mm = String(minutes).padStart(2, '0');
+        const ss = String(seconds).padStart(2, '0');
+
+        this.elements.sessionTimer.textContent = `${mm}:${ss}`;
+    }
+
     // === Event Handlers ===
 
     async handleConnect() {
@@ -300,6 +341,10 @@ class MakeSenseApp {
         this.updateStats();
         this.elements.currentValue.textContent = '--';
         this.stopAlarm();
+        this.resetTimer();
+        if (this.ble.isConnected) {
+            this.startTimer(); // Restart timer if still connected
+        }
     }
 
     handleExport() {
@@ -337,6 +382,7 @@ class MakeSenseApp {
                 this.elements.zeroBtn.disabled = false;
                 this.elements.exportBtn.disabled = false;
                 this.updateStatusMessage('已连接，等待数据...');
+                this.startTimer(); // Start timer
                 break;
             case 'disconnected':
                 statusText.textContent = '未连接';
@@ -345,6 +391,7 @@ class MakeSenseApp {
                 this.elements.exportBtn.disabled = this.dataPoints.length === 0;
                 this.updateStatusMessage('已断开连接');
                 this.stopAlarm();
+                this.stopTimer(); // Stop timer
                 break;
         }
     }
@@ -443,7 +490,7 @@ class MakeSenseApp {
     updateStats() {
         this.elements.minValue.textContent = this.stats.min === Infinity ? '--' : this.stats.min.toFixed(3);
         this.elements.maxValue.textContent = this.stats.max === -Infinity ? '--' : this.stats.max.toFixed(3);
-        this.elements.sampleCount.textContent = this.stats.count;
+        // this.elements.sampleCount.textContent = this.stats.count; // Removed
     }
 }
 
