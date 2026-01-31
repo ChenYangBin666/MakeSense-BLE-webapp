@@ -422,8 +422,18 @@ class MakeSenseApp {
     updateChart() {
         if (this.state.isPaused) return;
 
-        const labels = this.dataPoints.map(p => p.time);
-        const data = this.dataPoints.map(p => p.value);
+        // Smart Downsampling
+        // Target around 100 points for optimal visual density on mobile
+        const targetPoints = 100;
+        let displayPoints = this.dataPoints;
+
+        if (this.dataPoints.length > targetPoints) {
+            const stride = Math.ceil(this.dataPoints.length / targetPoints);
+            displayPoints = this.dataPoints.filter((_, index) => index % stride === 0);
+        }
+
+        const labels = displayPoints.map(p => p.time);
+        const data = displayPoints.map(p => p.value);
 
         this.chart.data.labels = labels;
         this.chart.data.datasets[0].data = data;
