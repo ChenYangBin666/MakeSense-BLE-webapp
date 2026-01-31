@@ -3,15 +3,19 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>MakeSense Monitor</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 
 <body>
-    <div class="app-container">
+    <div class="app-container" id="appContainer">
         <!-- Header -->
         <header class="header">
             <h1>MakeSense</h1>
@@ -24,83 +28,105 @@
         <!-- Main Content -->
         <main class="main-content">
             <!-- Current Value Display -->
-            <section class="value-display">
+            <section class="value-display glass-card">
                 <div class="current-value" id="currentValue">--</div>
                 <div class="value-unit">μA</div>
                 <div class="status-message" id="statusMessage">等待连接...</div>
             </section>
 
-            <!-- Chart Controls -->
-            <section class="chart-controls">
-                <div class="control-group">
-                    <label>Y轴范围</label>
-                    <div class="toggle-group">
-                        <button class="toggle-btn active" id="yAxisAuto">自动</button>
-                        <button class="toggle-btn" id="yAxisFixed">固定</button>
-                    </div>
-                </div>
-                <div class="control-group input-group" id="yAxisInputs" style="display: none;">
-                    <input type="number" id="yMin" placeholder="Min" value="0" step="0.1">
-                    <span>-</span>
-                    <input type="number" id="yMax" placeholder="Max" value="1.0" step="0.1">
-                </div>
-                <div class="control-group">
-                    <label>时间窗口</label>
-                    <select id="timeWindow">
-                        <option value="60">1分钟</option>
-                        <option value="300">5分钟</option>
-                        <option value="600">10分钟</option>
-                    </select>
-                </div>
-                <div class="control-group">
+            <!-- Settings Panel -->
+            <section class="panel glass-card">
+                <!-- Chart Settings -->
+                <div class="panel-header">
+                    <span class="panel-title">图表设置</span>
                     <button class="icon-btn" id="pauseBtn" title="暂停/继续">
                         ⏸️
                     </button>
                 </div>
+                <div class="controls-row">
+                    <div class="control-item">
+                        <button class="toggle-btn active" id="yAxisAuto">自动</button>
+                        <button class="toggle-btn" id="yAxisFixed">固定</button>
+                    </div>
+                    <div class="control-item" id="yAxisInputs" style="display: none;">
+                        <input type="number" id="yMin" placeholder="Min" value="0" step="0.1">
+                        <span>-</span>
+                        <input type="number" id="yMax" placeholder="Max" value="1.0" step="0.1">
+                    </div>
+                    <div class="control-item">
+                        <select id="timeWindow">
+                            <option value="60">1分钟</option>
+                            <option value="300">5分钟</option>
+                            <option value="600">10分钟</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Alarm Settings -->
+                <div class="panel-header" style="margin-top: 12px;">
+                    <span class="panel-title">阈值报警</span>
+                    <div class="switch-group">
+                        <label class="switch">
+                            <input type="checkbox" id="alarmToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="controls-row" id="alarmControls" style="opacity: 0.5; pointer-events: none;">
+                    <div class="control-item">
+                        <span>报警阈值:</span>
+                        <input type="number" id="alarmThreshold" value="1.0" step="0.1">
+                        <span>μA</span>
+                    </div>
+                </div>
             </section>
 
             <!-- Chart -->
-            <section class="chart-container">
+            <section class="chart-container glass-card">
                 <canvas id="chart"></canvas>
             </section>
 
             <!-- Stats -->
             <section class="stats-row">
-                <div class="stat-item">
+                <div class="stat-item glass-card">
                     <span class="stat-label">最小值</span>
                     <span class="stat-value" id="minValue">--</span>
                 </div>
-                <div class="stat-item">
+                <div class="stat-item glass-card">
                     <span class="stat-label">最大值</span>
                     <span class="stat-value" id="maxValue">--</span>
                 </div>
-                <div class="stat-item">
+                <div class="stat-item glass-card">
                     <span class="stat-label">采样数</span>
                     <span class="stat-value" id="sampleCount">0</span>
                 </div>
             </section>
         </main>
 
-        <!-- Control Panel -->
-        <footer class="control-panel">
-            <button class="btn btn-primary" id="connectBtn">
-                <span class="btn-icon">📡</span>
-                连接设备
+        <!-- Bottom Actions -->
+        <footer class="control-bar">
+            <button class="action-btn primary" id="connectBtn">
+                <i>📡</i>
+                <span>连接</span>
             </button>
-            <button class="btn btn-secondary" id="zeroBtn" disabled>
-                <span class="btn-icon">🎯</span>
-                调零
+            <button class="action-btn" id="zeroBtn" disabled>
+                <i>🎯</i>
+                <span>调零</span>
             </button>
-            <button class="btn btn-secondary" id="clearBtn">
-                <span class="btn-icon">🗑️</span>
-                清空
+            <button class="action-btn" id="clearBtn">
+                <i>🗑️</i>
+                <span>清空</span>
             </button>
-            <button class="btn btn-secondary" id="exportBtn" disabled>
-                <span class="btn-icon">💾</span>
-                导出
+            <button class="action-btn" id="exportBtn" disabled>
+                <i>💾</i>
+                <span>导出</span>
             </button>
         </footer>
     </div>
+
+    <!-- Audio Element for Alarm -->
+    <audio id="alarmSound" src="https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3"
+        preload="auto" loop></audio>
 
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>

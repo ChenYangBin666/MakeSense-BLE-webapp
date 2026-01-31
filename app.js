@@ -9,7 +9,7 @@ class MakeSenseApp {
 
         // Data storage
         this.dataPoints = [];
-        this.maxDataPoints = 120; // 2 minutes at 1Hz
+        this.maxDataPoints = 60; // Default 1 minute
         this.stats = {
             min: Infinity,
             max: -Infinity,
@@ -19,8 +19,9 @@ class MakeSenseApp {
         // Chart
         this.chart = null;
 
-        // UI Elements (Updated)
+        // UI Elements
         this.elements = {
+            appContainer: document.getElementById('appContainer'),
             connectionStatus: document.getElementById('connectionStatus'),
             currentValue: document.getElementById('currentValue'),
             statusMessage: document.getElementById('statusMessage'),
@@ -31,23 +32,32 @@ class MakeSenseApp {
             zeroBtn: document.getElementById('zeroBtn'),
             clearBtn: document.getElementById('clearBtn'),
             exportBtn: document.getElementById('exportBtn'),
-            // New Controls
+
+            // Chart Controls
             yAxisAuto: document.getElementById('yAxisAuto'),
             yAxisFixed: document.getElementById('yAxisFixed'),
             yAxisInputs: document.getElementById('yAxisInputs'),
             yMinInput: document.getElementById('yMin'),
             yMaxInput: document.getElementById('yMax'),
             timeWindow: document.getElementById('timeWindow'),
-            pauseBtn: document.getElementById('pauseBtn')
+            pauseBtn: document.getElementById('pauseBtn'),
+
+            // Alarm Controls
+            alarmToggle: document.getElementById('alarmToggle'),
+            alarmControls: document.getElementById('alarmControls'),
+            alarmThreshold: document.getElementById('alarmThreshold'),
+            alarmSound: document.getElementById('alarmSound')
         };
 
-        // Chart State
-        this.chartState = {
+        // App State
+        this.state = {
             isPaused: false,
             yAxisMode: 'auto', // 'auto' or 'fixed'
             yMin: 0,
             yMax: 1.0,
-            timeWindow: 60 // seconds
+            isAlarmEnabled: false,
+            alarmThreshold: 1.0,
+            isAlarmTriggered: false
         };
 
         this.init();
@@ -58,10 +68,16 @@ class MakeSenseApp {
         this.bindEvents();
         this.bindBLEEvents();
         this.bindChartEvents();
+        this.bindAlarmEvents();
     }
 
     initChart() {
         const ctx = document.getElementById('chart').getContext('2d');
+
+        // Gradient for line fill
+        let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(0, 212, 170, 0.4)');
+        gradient.addColorStop(1, 'rgba(0, 212, 170, 0.0)');
 
         this.chart = new Chart(ctx, {
             type: 'line',
@@ -71,12 +87,13 @@ class MakeSenseApp {
                     label: 'Current (μA)',
                     data: [],
                     borderColor: '#00d4aa',
-                    backgroundColor: 'rgba(0, 212, 170, 0.1)',
+                    backgroundColor: gradient,
                     borderWidth: 2,
                     fill: true,
-                    tension: 0.3,
+                    tension: 0.4, // Smoother curve
                     pointRadius: 0,
-                    pointHoverRadius: 4
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: '#ffffff'
                 }]
             },
             options: {
@@ -90,9 +107,11 @@ class MakeSenseApp {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        backgroundColor: 'rgba(15, 12, 41, 0.9)',
                         titleColor: '#fff',
                         bodyColor: '#00d4aa',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
                         padding: 10,
                         displayColors: false,
                         callbacks: {
@@ -129,6 +148,14 @@ class MakeSenseApp {
         this.elements.zeroBtn.addEventListener('click', () => this.handleZero());
         this.elements.clearBtn.addEventListener('click', () => this.handleClear());
         this.elements.exportBtn.addEventListener('click', () => this.handleExport());
+
+        // Initialize alarm sound user interaction (needed for some browsers)
+        document.body.addEventListener('click', () => {
+            if (this.elements.alarmSound.paused) {
+                // Just to unlock audio context
+                this.elements.alarmSound.load();
+            }
+        }, { once: true });
     }
 
     bindChartEvents() {
@@ -138,8 +165,8 @@ class MakeSenseApp {
 
         // Y-Axis Inputs
         const updateYRange = () => {
-            this.chartState.yMin = parseFloat(this.elements.yMinInput.value) || 0;
-            this.chartState.yMax = parseFloat(this.elements.yMaxInput.value) || 1.0;
+            this.state.yMin = parseFloat(this.elements.yMinInput.value) || 0;
+            this.state.yMax = parseFloat(this.elements.yMaxInput.value) || 1.0;
             this.updateChartConfig();
         };
         this.elements.yMinInput.addEventListener('change', updateYRange);
@@ -152,9 +179,25 @@ class MakeSenseApp {
 
         // Pause Button
         this.elements.pauseBtn.addEventListener('click', () => {
-            this.chartState.isPaused = !this.chartState.isPaused;
-            this.elements.pauseBtn.classList.toggle('active', this.chartState.isPaused);
-            this.elements.pauseBtn.innerHTML = this.chartState.isPaused ? '▶️' : '⏸️';
+            this.state.isPaused = !this.state.isPaused;
+            this.elements.pauseBtn.classList.toggle('active', this.state.isPaused);
+            // Consider changing icon if needed, but styling handles opacity
+        });
+    }
+
+    bindAlarmEvents() {
+        this.elements.alarmToggle.addEventListener('change', (e) => {
+            this.state.isAlarmEnabled = e.target.checked;
+            this.elements.alarmControls.style.opacity = this.state.isAlarmEnabled ? '1' : '0.5';
+            this.elements.alarmControls.style.pointerEvents = this.state.isAlarmEnabled ? 'auto' : 'none';
+
+            if (!this.state.isAlarmEnabled) {
+                this.stopAlarm();
+            }
+        });
+
+        this.elements.alarmThreshold.addEventListener('change', (e) => {
+            this.state.alarmThreshold = parseFloat(e.target.value) || 1.0;
         });
     }
 
@@ -164,10 +207,10 @@ class MakeSenseApp {
         this.ble.on('error', (data) => this.handleError(data));
     }
 
-    // === Chart Control Logic ===
+    // === Application Logic ===
 
     setYAxisMode(mode) {
-        this.chartState.yAxisMode = mode;
+        this.state.yAxisMode = mode;
 
         // UI Update
         this.elements.yAxisAuto.classList.toggle('active', mode === 'auto');
@@ -178,9 +221,9 @@ class MakeSenseApp {
     }
 
     updateChartConfig() {
-        if (this.chartState.yAxisMode === 'fixed') {
-            this.chart.options.scales.y.min = this.chartState.yMin;
-            this.chart.options.scales.y.max = this.chartState.yMax;
+        if (this.state.yAxisMode === 'fixed') {
+            this.chart.options.scales.y.min = this.state.yMin;
+            this.chart.options.scales.y.max = this.state.yMax;
         } else {
             delete this.chart.options.scales.y.min;
             delete this.chart.options.scales.y.max;
@@ -189,15 +232,42 @@ class MakeSenseApp {
     }
 
     setSampleLimit(seconds) {
-        // Assuming 1 sample per second (1Hz)
-        // If sample rate changes, this logic needs adjustment
         this.maxDataPoints = seconds;
-
-        // Trim existing data if needed
         if (this.dataPoints.length > this.maxDataPoints) {
             this.dataPoints = this.dataPoints.slice(-this.maxDataPoints);
             this.updateChart();
         }
+    }
+
+    checkAlarm(value) {
+        if (!this.state.isAlarmEnabled) return;
+
+        if (value > this.state.alarmThreshold) {
+            if (!this.state.isAlarmTriggered) {
+                this.triggerAlarm();
+            }
+        } else {
+            if (this.state.isAlarmTriggered) {
+                this.stopAlarm();
+            }
+        }
+    }
+
+    triggerAlarm() {
+        this.state.isAlarmTriggered = true;
+        this.elements.appContainer.classList.add('alarm-active');
+        this.elements.currentValue.classList.add('negative'); // Reuse negative style for red color
+
+        this.elements.alarmSound.play().catch(e => console.log('Audio play failed:', e));
+    }
+
+    stopAlarm() {
+        this.state.isAlarmTriggered = false;
+        this.elements.appContainer.classList.remove('alarm-active');
+        this.elements.currentValue.classList.remove('negative');
+
+        this.elements.alarmSound.pause();
+        this.elements.alarmSound.currentTime = 0;
     }
 
     // === Event Handlers ===
@@ -229,6 +299,7 @@ class MakeSenseApp {
         this.updateChart();
         this.updateStats();
         this.elements.currentValue.textContent = '--';
+        this.stopAlarm();
     }
 
     handleExport() {
@@ -259,21 +330,21 @@ class MakeSenseApp {
         switch (data.state) {
             case 'connecting':
                 statusText.textContent = '连接中...';
-                this.elements.connectBtn.querySelector('span:last-child').textContent = '连接中...';
                 break;
             case 'connected':
                 statusText.textContent = '已连接';
-                this.elements.connectBtn.querySelector('span:last-child').textContent = '断开';
+                this.elements.connectBtn.querySelector('span').textContent = '断开';
                 this.elements.zeroBtn.disabled = false;
                 this.elements.exportBtn.disabled = false;
                 this.updateStatusMessage('已连接，等待数据...');
                 break;
             case 'disconnected':
                 statusText.textContent = '未连接';
-                this.elements.connectBtn.querySelector('span:last-child').textContent = '连接设备';
+                this.elements.connectBtn.querySelector('span').textContent = '连接';
                 this.elements.zeroBtn.disabled = true;
                 this.elements.exportBtn.disabled = this.dataPoints.length === 0;
                 this.updateStatusMessage('已断开连接');
+                this.stopAlarm();
                 break;
         }
     }
@@ -294,7 +365,7 @@ class MakeSenseApp {
     // === UI Updates ===
 
     addDataPoint(value) {
-        if (this.chartState.isPaused) return; // Skip updates if paused
+        if (this.state.isPaused) return;
 
         const now = new Date();
         const timeStr = now.toLocaleTimeString('zh-CN', {
@@ -309,7 +380,6 @@ class MakeSenseApp {
             timestamp: now.getTime()
         });
 
-        // Keep only recent points
         if (this.dataPoints.length > this.maxDataPoints) {
             this.dataPoints.shift();
         }
@@ -319,6 +389,9 @@ class MakeSenseApp {
         if (value < this.stats.min) this.stats.min = value;
         if (value > this.stats.max) this.stats.max = value;
 
+        // Alarm Check
+        this.checkAlarm(value);
+
         // Update UI
         this.updateCurrentValue(value);
         this.updateChart();
@@ -327,14 +400,17 @@ class MakeSenseApp {
 
     updateCurrentValue(value) {
         this.elements.currentValue.textContent = value.toFixed(3);
-        this.elements.currentValue.classList.toggle('negative', value < 0);
+        // We handle negative class in alarm logic or regular negative value logic
+        // If not alarming, show red if negative
+        if (!this.state.isAlarmTriggered) {
+            this.elements.currentValue.classList.toggle('negative', value < 0);
+        }
     }
 
     updateStatusMessage(message) {
         const el = this.elements.statusMessage;
         el.textContent = message;
 
-        // Apply special styles
         el.classList.remove('zeroing', 'ready');
         if (message.includes('调零')) {
             el.classList.add('zeroing');
@@ -344,7 +420,7 @@ class MakeSenseApp {
     }
 
     updateChart() {
-        if (this.chartState.isPaused) return;
+        if (this.state.isPaused) return;
 
         const labels = this.dataPoints.map(p => p.time);
         const data = this.dataPoints.map(p => p.value);
