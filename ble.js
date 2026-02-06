@@ -87,11 +87,19 @@ class MakeSenseBLE {
                 console.log('RawData characteristic not available');
             }
 
-            // Subscribe to status notifications
+            // Subscribe to status notifications (FFF2 - string data)
             await this.charStatus.startNotifications();
             this.charStatus.addEventListener('characteristicvaluechanged', (event) => {
                 this.handleStatusNotification(event);
             });
+
+            // Subscribe to raw data notifications (FFF1 - binary packet)
+            if (this.charRawData) {
+                await this.charRawData.startNotifications();
+                this.charRawData.addEventListener('characteristicvaluechanged', (event) => {
+                    this.handleRawDataNotification(event);
+                });
+            }
 
             this.isConnected = true;
             this.emit('connection', { state: 'connected', device: this.device.name });
@@ -129,7 +137,67 @@ class MakeSenseBLE {
     }
 
     /**
-     * Handle status notification from device
+     * Handle status notification from device (FFF2 - String)
+     */
+    handleStatusNotification(event) {
+        const decoder = new TextDecoder('utf-8');
+        const value = decoder.decode(event.target.value);
+
+        // Try to parse as number
+        const numValue = parseFloat(value);
+
+        if (!isNaN(numValue)) {
+            // It's a numeric value (current reading)
+            this.emit('status', {
+                type: 'value',
+                value: numValue,
+                raw: value
+            });
+        } else {
+            // It's a status message
+            this.emit('status', {
+                type: 'message',
+                message: value.trim()
+            });
+        }
+    }
+
+    /**
+     * Handle raw data notification from device (FFF1 - Binary packet)
+     * Packet format:
+     * - uptime_ms: uint32 (4 bytes)
+     * - adj_raw: int32 (4 bytes)
+     * - adj_uv: int32 (4 bytes) - Adjusted voltage in microvolts
+     * - temp_centi_c: int16 (2 bytes)
+     * - flags: uint16 (2 bytes)
+     * Total: 16 bytes
+     */
+    handleRawDataNotification(event) {
+        const dataView = event.target.value;
+        const packet = {
+            uptime_ms: dataView.getUint32(0, true),      // Little endian
+            adj_raw: dataView.getInt32(4, true),
+            adj_uv: dataView.getInt32(8, true),          // Adjusted voltage in uV
+            temp_centi_c: dataView.getInt16(12, true),
+            flags: dataView.getUint16(14, true)
+        };
+
+        // Convert adjusted voltage to current (using TIA gain)
+        // Current (uA) = Voltage (uV) / R (ohm)
+        // For 7k ohm TIA: current = adj_uv / 7000
+        const TIA_GAIN_OHM = 7000;  // Default TIA gain
+        const current_uA = packet.adj_uv / TIA_GAIN_OHM;
+
+        this.emit('rawdata', {
+            uptime_ms: packet.uptime_ms,
+            voltage_uv: packet.adj_uv,
+            current_uA: current_uA,
+            flags: packet.flags
+        });
+    }
+
+    /**
+     * Send command to device
      */
     handleStatusNotification(event) {
         const decoder = new TextDecoder('utf-8');
